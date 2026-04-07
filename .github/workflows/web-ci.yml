@@ -1,13 +1,20 @@
-name: Global CI
+name: Web CI
 
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - 'myfloorplan-web/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
   pull_request:
     branches: [ main, master ]
+    paths:
+      - 'myfloorplan-web/**'
 
 jobs:
-  workspace-check:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,5 +34,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Workspace Lint
-        run: pnpm lint
+      - name: Lint
+        run: pnpm --filter myfloorplan-web run lint
+
+      - name: Build
+        run: pnpm --filter myfloorplan-web run build

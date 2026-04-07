@@ -8,7 +8,8 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "hono": "^4.0.0"
+    "hono": "^4.0.0",
+    "@myfloorplan/shared": "workspace:*"
   },
   "devDependencies": {
     "@hono/vite-build": "^1.11.1",

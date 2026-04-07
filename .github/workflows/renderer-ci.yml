@@ -1,13 +1,20 @@
-name: Global CI
+name: Renderer CI
 
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - 'myfloorplan-renderer/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
   pull_request:
     branches: [ main, master ]
+    paths:
+      - 'myfloorplan-renderer/**'
 
 jobs:
-  workspace-check:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,5 +34,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Workspace Lint
-        run: pnpm lint
+      - name: Build
+        run: pnpm --filter myfloorplan-renderer run build
