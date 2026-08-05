@@ -21,3 +21,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Database artifacts: local dumps and generated migrations
+# Schema source of truth is src/db/schema.ts; migrations can be
+# regenerated locally with `drizzle-kit generate` if needed.
+*.sql
+drizzle/

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Project } from '../../types'
-import { Calendar, Edit2, Trash2, FolderOpen } from 'lucide-react'
+import { Calendar as IconCalendar, Edit2 as IconEdit2, Trash2 as IconTrash2, FolderOpen as IconFolderOpen } from 'lucide-react'
 import { useEditorStore } from '../../store/useEditorStore'
 
 interface ProjectCardProps {
@@ -21,7 +21,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit }) => {
           <img src={project.thumbnailUrl} alt={project.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center opacity-20">
-            <FolderOpen className="w-12 h-12" />
+            <IconFolderOpen className="w-12 h-12" />
           </div>
         )}
         {isActive && (
@@ -37,7 +37,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit }) => {
         
         <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider opacity-60">
           <span className="flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
+            <IconCalendar className="w-3 h-3" />
             {new Date(project.updatedAt).toLocaleDateString()}
           </span>
           <span>{project.data.wallLines.length} Walls</span>
@@ -55,14 +55,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit }) => {
               onClick={() => onEdit(project)}
               className="btn btn-sm btn-square btn-ghost bg-base-300 hover:bg-base-100"
             >
-              <Edit2 className="w-4 h-4" />
+              <IconEdit2 className="w-4 h-4" />
             </button>
             <button 
               onClick={() => removeProject(project.id)}
               className="btn btn-sm btn-square btn-ghost text-error bg-base-300 hover:bg-error/10"
               disabled={isActive && project.name === 'Default Project'}
             >
-              <Trash2 className="w-4 h-4" />
+              <IconTrash2 className="w-4 h-4" />
             </button>
           </div>
         </div>

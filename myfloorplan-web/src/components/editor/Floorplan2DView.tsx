@@ -1,54 +1,27 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Stage, Layer, Line, Text, Image as KonvaImage, Rect, Circle, Group } from 'react-konva'
+import { Stage, Layer, Line, Text, Image as KonvaImage, Rect, Circle, Group, Transformer } from 'react-konva'
 import { useEditorStore } from '../../store/useEditorStore'
 import { WallLine, PlacedItem, DrawTool } from '../../types'
 import { v4 as uuidv4 } from 'uuid'
 import useImage from 'use-image'
 import { 
-  Move, 
-  Search, 
-  Maximize, 
-  Ruler as RulerIcon, 
-  Plus, 
-  Minus,
-  MousePointer2,
-  Square,
-  DoorOpen,
-  Layout
+  Move as IconMove, 
+  Search as IconSearch, 
+  Maximize as IconMaximize, 
+  Ruler as IconRuler, 
+  Plus as IconPlus, 
+  Minus as IconMinus,
+  MousePointer2 as IconMousePointer2,
+  Square as IconSquare,
+  DoorOpen as IconDoorOpen,
+  Layout as IconLayout
 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
-
-const FurnitureIcon = ({ item }: { item: PlacedItem }) => {
-  const [image] = useImage(item.imageUrl || '')
-  return image ? (
-    <KonvaImage
-      image={image}
-      x={item.position.x}
-      y={item.position.z}
-      width={50}
-      height={50}
-      offsetX={25}
-      offsetY={25}
-      rotation={item.rotation}
-      draggable
-    />
-  ) : (
-    <Rect
-      x={item.position.x}
-      y={item.position.z}
-      width={40}
-      height={40}
-      offsetX={20}
-      offsetY={20}
-      fill="#6366F1"
-      cornerRadius={5}
-      rotation={item.rotation}
-      draggable
-      name="furniture-icon"
-      id={item.id}
-    />
-  )
-}
+import Furniture2D from '../floorplan/2d/Furniture2D'
+import Wall2D from '../floorplan/2d/Wall2D'
+import Room2D from '../floorplan/2d/Room2D'
+import Light2D from '../floorplan/2d/Light2D'
+import Stair2D from '../floorplan/2d/Stair2D'
 
 const Floorplan2DView: React.FC = () => {
   const { 
@@ -58,7 +31,8 @@ const Floorplan2DView: React.FC = () => {
     placedItems, addPlacedItem, 
     selectedLibraryItem, setSelectedLibraryItem,
     selectedElement, setSelectedElement,
-    gridSize, activeTool, setActiveTool
+    gridSize, activeTool, setActiveTool,
+    removeWallLine, removeRoom, removePlacedItem, removeWallOpening
   } = useEditorStore(useShallow(state => ({
     wallLines: state.wallLines,
     addWallLine: state.addWallLine,
@@ -73,14 +47,45 @@ const Floorplan2DView: React.FC = () => {
     setSelectedElement: state.setSelectedElement,
     gridSize: state.gridSize,
     activeTool: state.activeTool,
-    setActiveTool: state.setActiveTool
+    setActiveTool: state.setActiveTool,
+    removeWallLine: state.removeWallLine,
+    removeRoom: state.removeRoom,
+    removePlacedItem: state.removePlacedItem,
+    removeWallOpening: state.removeWallOpening
   })))
   
   const containerRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<any>(null)
+  const trRef = useRef<any>(null)
+  
+  const [deleteConfirmElement, setDeleteConfirmElement] = useState<SelectedElement | null>(null)
+  
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [currentLine, setCurrentLine] = useState<number[] | null>(null)
   const [currentRoomPoints, setCurrentRoomPoints] = useState<number[]>([])
   const isDrawing = useRef(false)
+
+  // Transformer binding
+  useEffect(() => {
+    if (selectedElement && activeTool === 'Select') {
+      let node: any = null
+      
+      if (selectedElement.type === 'Item') {
+        node = stageRef.current?.findOne(`#${selectedElement.id}`)
+      } else if (selectedElement.type === 'Opening') {
+        node = stageRef.current?.findOne(`#opening-${selectedElement.id}`)
+      }
+      
+      if (node && trRef.current) {
+        trRef.current.nodes([node])
+        trRef.current.getLayer().batchDraw()
+      } else if (trRef.current) {
+        trRef.current.nodes([])
+      }
+    } else if (trRef.current) {
+      trRef.current.nodes([])
+    }
+  }, [selectedElement, activeTool])
 
   // Pan & Zoom State
   const [stageScale, setStageScale] = useState(1)
@@ -132,14 +137,42 @@ const Floorplan2DView: React.FC = () => {
       return
     }
 
-    // 1. TOOL: PLACE ITEM (Furniture)
+    // 1. TOOL: PLACE ITEM (Furniture / Decor)
     if (selectedLibraryItem) {
+      let finalX = snappedX;
+      let finalY = snappedY;
+      let finalRot = 0;
+
+      // Smart Wall Snapping Logic
+      let minDistance = 30; // Snapping radius threshold
+      for (const wall of wallLines) {
+        const [x1, y1, x2, y2] = wall.points;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const lenSq = dx*dx + dy*dy;
+        if (lenSq === 0) continue;
+
+        let t = ((pos.x - x1) * dx + (pos.y - y1) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t)); // clamp to line segment
+        const closestX = x1 + t * dx;
+        const closestY = y1 + t * dy;
+        const dist = Math.sqrt(Math.pow(pos.x - closestX, 2) + Math.pow(pos.y - closestY, 2));
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          finalX = snapToGrid(closestX);
+          finalY = snapToGrid(closestY);
+          // Calculate normal angle facing into the room (perpendicular to wall)
+          finalRot = Math.round((Math.atan2(dy, dx) * 180 / Math.PI) + 90);
+        }
+      }
+
       const newItem: PlacedItem = {
         id: uuidv4(),
         type: selectedLibraryItem.title,
         category: selectedLibraryItem.category,
-        position: { x: snappedX, y: 0, z: snappedY },
-        rotation: 0,
+        position: { x: finalX, y: 0, z: finalY },
+        rotation: finalRot,
         scale: 1,
         imageUrl: selectedLibraryItem.imageUrl,
         modelUrl: selectedLibraryItem.modelUrl
@@ -201,6 +234,23 @@ const Floorplan2DView: React.FC = () => {
     if (activeTool === 'Select') {
       const target = e.target
       const stage = target.getStage()
+      
+      if (target.attrs.name === 'opening') {
+        const openingId = target.attrs.id
+        // We need to find the parent wall
+        let parentWallId = null
+        for (const wall of wallLines) {
+          if (wall.openings?.some(o => `opening-${o.id}` === openingId)) {
+            parentWallId = wall.id
+            break
+          }
+        }
+        if (parentWallId) {
+          setSelectedElement({ id: openingId, type: 'Opening', parentId: parentWallId })
+          return
+        }
+      }
+
       const wallId = target.attrs.id?.startsWith('wall-') ? target.attrs.id.replace('wall-', '') : null
       
       if (wallId) {
@@ -324,21 +374,59 @@ const Floorplan2DView: React.FC = () => {
     return (Math.sqrt(dx * dx + dy * dy) / 100).toFixed(2) // 100px = 1 unit (m or ft)
   }
 
+  const handleDeleteSelected = () => {
+    console.log("Delete Selected clicked! Element:", selectedElement)
+    if (!selectedElement) return
+    setDeleteConfirmElement(selectedElement)
+  }
+
+  const confirmDeleteAction = () => {
+    if (!deleteConfirmElement) return
+
+    switch (deleteConfirmElement.type) {
+      case 'Wall':
+        removeWallLine(deleteConfirmElement.id)
+        break
+      case 'Room':
+        removeRoom(deleteConfirmElement.id)
+        break
+      case 'Item':
+        removePlacedItem(deleteConfirmElement.id)
+        break
+      case 'Opening':
+        if (deleteConfirmElement.parentId) {
+          removeWallOpening(deleteConfirmElement.parentId, deleteConfirmElement.id.replace('opening-', ''))
+        }
+        break
+    }
+    
+    if (selectedElement?.id === deleteConfirmElement.id) {
+      setSelectedElement(null)
+    }
+    setDeleteConfirmElement(null)
+  }
+
   return (
     <div ref={containerRef} className="w-full h-full bg-[#f8fafc] overflow-hidden relative">
-      <Stage
-        width={size.width}
-        height={size.height}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onWheel={handleWheel}
-        scaleX={stageScale}
-        scaleY={stageScale}
-        x={stagePos.x}
-        y={stagePos.y}
-        draggable={activeTool === 'Pan'}
-        onDragEnd={(e) => setStagePos({ x: e.target.x(), y: e.target.y() })}
+      {size.width > 0 && size.height > 0 && (
+        <Stage
+          ref={stageRef}
+          width={size.width}
+          height={size.height}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onWheel={handleWheel}
+          scaleX={stageScale}
+          scaleY={stageScale}
+          x={stagePos.x}
+          y={stagePos.y}
+          draggable={activeTool === 'Pan'}
+        onDragEnd={(e) => {
+          if (e.target === e.currentTarget) {
+            setStagePos({ x: e.target.x(), y: e.target.y() })
+          }
+        }}
         className={
           activeTool === 'Pan' ? "cursor-grab active:cursor-grabbing" : 
           activeTool === 'Ruler' ? "cursor-help" :
@@ -351,46 +439,35 @@ const Floorplan2DView: React.FC = () => {
           
           {/* Rooms / Floors */}
           {rooms.map(room => (
-            <Line
-              key={room.id}
-              points={room.points}
-              fill={room.color || '#6366F1'}
-              opacity={0.1}
-              closed
-              stroke={room.color || '#6366F1'}
-              strokeWidth={1}
+            <Room2D 
+              key={room.id} 
+              room={room} 
+              isSelected={selectedElement?.id === room.id} 
             />
           ))}
 
           {/* Walls */}
           {wallLines.map((line) => (
-            <Line
-              key={line.id}
-              id={`wall-${line.id}`}
-              points={line.points}
-              stroke={selectedElement?.id === line.id ? '#EF4444' : "#334155"}
-              strokeWidth={line.thickness || 12}
-              lineCap="butt"
-              lineJoin="miter"
-              onMouseEnter={(e) => {
-                if (activeTool === 'Select') {
-                  const container = e.target.getStage()?.container()
-                  if (container) container.style.cursor = 'pointer'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTool === 'Select') {
-                  const container = e.target.getStage()?.container()
-                  if (container) container.style.cursor = 'default'
-                }
-              }}
+            <Wall2D 
+              key={line.id} 
+              wall={line} 
+              isSelected={selectedElement?.id === line.id} 
+              activeTool={activeTool}
+              selectedElement={selectedElement}
             />
           ))}
           
           {/* Placed Items */}
-          {placedItems.map((item) => (
-            <FurnitureIcon key={item.id} item={item} />
-          ))}
+          {placedItems.map((item) => {
+            const isSelected = selectedElement?.id === item.id
+            if ('lightType' in item) {
+              return <Light2D key={item.id} light={item} isSelected={isSelected} />
+            }
+            if (item.type === 'Stair') {
+              return <Stair2D key={item.id} stair={item} isSelected={isSelected} />
+            }
+            return <Furniture2D key={item.id} item={item} isSelected={isSelected} />
+          })}
           
           {/* Wall Preview */}
           {currentLine && (
@@ -403,6 +480,28 @@ const Floorplan2DView: React.FC = () => {
               dash={[5, 5]}
             />
           )}
+
+          {/* Room Preview */}
+          {currentRoomPoints.length > 0 && (
+            <Line
+              points={currentRoomPoints}
+              stroke="#6366F1"
+              strokeWidth={2}
+              dash={[5, 5]}
+            />
+          )}
+
+          {/* Transformer Gizmo */}
+          <Transformer 
+            ref={trRef} 
+            boundBoxFunc={(oldBox, newBox) => {
+              // limit resize
+              if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
+                return oldBox;
+              }
+              return newBox;
+            }}
+          />
 
           {/* Ruler Tool Preview */}
           {rulerStart && rulerEnd && (
@@ -431,47 +530,65 @@ const Floorplan2DView: React.FC = () => {
           )}
         </Layer>
       </Stage>
+      )}
 
       {/* Floating Toolbar */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 bg-base-100/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-content/10">
+      <div 
+        className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 bg-base-100/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-content/10"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <ToolbarButton 
           active={activeTool === 'Select'} 
           onClick={() => setActiveTool('Select')} 
-          icon={<MousePointer2 className="w-4 h-4" />} 
+          icon={<IconMousePointer2 className="w-4 h-4" />} 
           label="Select" 
         />
         <div className="w-px h-6 bg-base-content/10 mx-1" />
         <ToolbarButton 
           active={activeTool === 'Pan'} 
           onClick={() => setActiveTool('Pan')} 
-          icon={<Move className="w-4 h-4" />} 
+          icon={<IconMove className="w-4 h-4" />} 
           label="Pan (H)" 
         />
         <ToolbarButton 
           active={activeTool === 'Ruler'} 
           onClick={() => setActiveTool('Ruler')} 
-          icon={<RulerIcon className="w-4 h-4" />} 
+          icon={<IconRuler className="w-4 h-4" />} 
           label="Ruler (M)" 
         />
         <div className="w-px h-6 bg-base-content/10 mx-1" />
         <ToolbarButton 
           active={false} 
           onClick={() => setStageScale(s => s * 1.2)} 
-          icon={<Plus className="w-4 h-4" />} 
+          icon={<IconPlus className="w-4 h-4" />} 
           label="Zoom In" 
         />
         <ToolbarButton 
           active={false} 
           onClick={() => setStageScale(s => s / 1.2)} 
-          icon={<Minus className="w-4 h-4" />} 
+          icon={<IconMinus className="w-4 h-4" />} 
           label="Zoom Out" 
         />
         <ToolbarButton 
           active={false} 
           onClick={resetView} 
-          icon={<Maximize className="w-4 h-4" />} 
+          icon={<IconMaximize className="w-4 h-4" />} 
           label="Reset View (R)" 
         />
+        {selectedElement && (
+          <>
+            <div className="w-px h-6 bg-base-content/10 mx-1" />
+            <ToolbarButton 
+              active={false} 
+              onClick={handleDeleteSelected} 
+              icon={
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-error"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              } 
+              label="Delete Selected" 
+            />
+          </>
+        )}
       </div>
       
       <div className="absolute bottom-4 right-4 flex flex-col gap-2 items-end">
@@ -481,6 +598,20 @@ const Floorplan2DView: React.FC = () => {
           <span className="opacity-60">GRID: {gridSize}px</span>
         </div>
       </div>
+
+      {/* Custom Confirm Delete Modal */}
+      {deleteConfirmElement && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg text-error">Confirm Deletion</h3>
+            <p className="py-4">Are you sure you want to delete this {deleteConfirmElement.type}?</p>
+            <div className="modal-action">
+              <button className="btn" onClick={() => setDeleteConfirmElement(null)}>Cancel</button>
+              <button className="btn btn-error" onClick={confirmDeleteAction}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

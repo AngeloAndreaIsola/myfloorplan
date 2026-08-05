@@ -1,6 +1,6 @@
 import React from 'react'
 import { Project } from '../../types'
-import { Calendar, User, Info, Clock } from 'lucide-react'
+import { Calendar as IconCalendar, User as IconUser, Info as IconInfo, Clock as IconClock } from 'lucide-react'
 
 interface ProjectInfoProps {
   project: Project
@@ -11,7 +11,7 @@ const ProjectInfo: React.FC<ProjectInfoProps> = ({ project }) => {
     <div className="card bg-base-300 p-4 border border-base-100 shadow-inner">
       <div className="flex items-start gap-4">
         <div className="p-3 bg-primary/10 rounded-xl">
-          <Info className="w-6 h-6 text-primary" />
+          <IconInfo className="w-6 h-6 text-primary" />
         </div>
         <div className="space-y-1">
           <h3 className="text-lg font-bold leading-tight">{project.name}</h3>
@@ -24,13 +24,13 @@ const ProjectInfo: React.FC<ProjectInfoProps> = ({ project }) => {
       <div className="mt-6 grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-1">
-            <Calendar className="w-2 h-2" /> Created
+            <IconCalendar className="w-2 h-2" /> Created
           </span>
           <span className="text-sm font-medium">{new Date(project.createdAt).toLocaleDateString()}</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-widest opacity-40 flex items-center gap-1">
-            <Clock className="w-2 h-2" /> Modified
+            <IconClock className="w-2 h-2" /> Modified
           </span>
           <span className="text-sm font-medium">{new Date(project.updatedAt).toLocaleTimeString()}</span>
         </div>
@@ -42,16 +42,26 @@ const ProjectInfo: React.FC<ProjectInfoProps> = ({ project }) => {
         </div>
         <div className="mt-2 space-y-2">
           <div className="flex justify-between items-center bg-base-100/30 p-2 rounded">
+            <span className="text-xs opacity-60">Floors</span>
+            <span className="badge badge-sm badge-neutral">{project.floors?.length || 0}</span>
+          </div>
+          <div className="flex justify-between items-center bg-base-100/30 p-2 rounded">
             <span className="text-xs opacity-60">Wall Segments</span>
-            <span className="badge badge-sm badge-neutral">{project.data.wallLines.length}</span>
+            <span className="badge badge-sm badge-neutral">
+              {project.floors?.reduce((sum, f) => sum + (f.data?.wallLines?.length || 0), 0) || 0}
+            </span>
           </div>
           <div className="flex justify-between items-center bg-base-100/30 p-2 rounded">
             <span className="text-xs opacity-60">Rooms Created</span>
-            <span className="badge badge-sm badge-neutral">{project.data.rooms.length}</span>
+            <span className="badge badge-sm badge-neutral">
+              {project.floors?.reduce((sum, f) => sum + (f.data?.rooms?.length || 0), 0) || 0}
+            </span>
           </div>
           <div className="flex justify-between items-center bg-base-100/30 p-2 rounded">
             <span className="text-xs opacity-60">Furniture Items</span>
-            <span className="badge badge-sm badge-neutral">{project.data.placedItems.length}</span>
+            <span className="badge badge-sm badge-neutral">
+              {project.floors?.reduce((sum, f) => sum + (f.data?.placedItems?.length || 0), 0) || 0}
+            </span>
           </div>
         </div>
       </div>

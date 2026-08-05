@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { 
   Engine, 
   Scene, 
@@ -7,21 +7,23 @@ import {
   HemisphericLight, 
   MeshBuilder, 
   StandardMaterial, 
-  PBRMaterial,
   Color3,
   Color4,
-  SceneLoader,
-  CSG,
   DirectionalLight,
   ShadowGenerator,
-  DefaultRenderingPipeline,
-  Texture
+  DefaultRenderingPipeline
 } from 'babylonjs'
 import 'babylonjs-loaders'
-import earcut from 'earcut'
 import { useEditorStore } from '../../store/useEditorStore'
-import { Sun, Moon, Box, Layers, Zap } from 'lucide-react'
+import { Sun as IconSun, Moon as IconMoon, Layers as IconLayers } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
+import { SceneProvider } from '../floorplan/3d/SceneContext'
+import Wall3D from '../floorplan/3d/Wall3D'
+import Room3D from '../floorplan/3d/Room3D'
+import Furniture3D from '../floorplan/3d/Furniture3D'
+import Light3D from '../floorplan/3d/Light3D'
+import Stair3D from '../floorplan/3d/Stair3D'
+import WallDecoration3D from '../floorplan/3d/WallDecoration3D'
 
 const Floorplan3DView: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -33,13 +35,12 @@ const Floorplan3DView: React.FC = () => {
     renderSettings: state.renderSettings,
     setRenderSettings: state.setRenderSettings
   })))
+  
+  const [sceneReady, setSceneReady] = useState(false)
   const sceneRef = useRef<Scene | null>(null)
   const sunLightRef = useRef<DirectionalLight | null>(null)
   const shadowGeneratorRef = useRef<ShadowGenerator | null>(null)
   const engineRef = useRef<Engine | null>(null)
-  const wallsGroupRef = useRef<any[]>([])
-  const itemsGroupRef = useRef<any[]>([])
-  const roomsGroupRef = useRef<any[]>([])
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -93,9 +94,12 @@ const Floorplan3DView: React.FC = () => {
     const obs = new ResizeObserver(() => engine.resize())
     if (containerRef.current) obs.observe(containerRef.current)
 
+    setSceneReady(true)
+
     return () => {
       obs.disconnect()
       engine.dispose()
+      setSceneReady(false)
     }
   }, [])
 
@@ -127,10 +131,6 @@ const Floorplan3DView: React.FC = () => {
         shadows.blurKernel = 32
         shadows.setDarkness(0.5)
         shadowGeneratorRef.current = shadows
-        
-        // Add existing meshes to shadow caster
-        wallsGroupRef.current.forEach(m => shadows.addShadowCaster(m))
-        itemsGroupRef.current.forEach(root => root.getChildMeshes().forEach((m: any) => shadows.addShadowCaster(m)))
       }
     } else {
       if (shadowGeneratorRef.current) {
@@ -138,149 +138,31 @@ const Floorplan3DView: React.FC = () => {
         shadowGeneratorRef.current = null
       }
     }
-  }, [renderSettings.sunlight, renderSettings.shadows])
-
-  // Sync scene (Walls, Rooms, Items)
-  useEffect(() => {
-    const scene = sceneRef.current
-    const shadowGenerator = shadowGeneratorRef.current
-    if (!scene) return
-
-    const createMaterial = (name: string, colorHex: string, textureUrl?: string) => {
-      if (renderSettings.pbr) {
-        const pbr = new PBRMaterial(name, scene)
-        pbr.albedoColor = Color3.FromHexString(colorHex)
-        pbr.metallic = 0.1
-        pbr.roughness = 0.6
-        if (textureUrl) pbr.albedoTexture = new Texture(textureUrl, scene)
-        return pbr
-      } else {
-        const std = new StandardMaterial(name, scene)
-        std.diffuseColor = Color3.FromHexString(colorHex)
-        std.specularColor = new Color3(0, 0, 0)
-        if (textureUrl) std.diffuseTexture = new Texture(textureUrl, scene)
-        return std
-      }
-    }
-
-    // 1. SYNC WALLS
-    wallsGroupRef.current.forEach(m => m.dispose())
-    wallsGroupRef.current = []
-    
-    wallLines.forEach((wall) => {
-      const [x1, y1, x2, y2] = wall.points
-      const dx = x2 - x1
-      const dy = y2 - y1
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      const angle = Math.atan2(dy, dx)
-
-      const mat = createMaterial(`wallMat-${wall.id}`, wall.color || '#CBD5E1', wall.textureUrl)
-      if (mat instanceof StandardMaterial && mat.diffuseTexture) {
-        const tex = mat.diffuseTexture as Texture
-        tex.uScale = distance / 100
-        tex.vScale = 1.2
-      } else if (mat instanceof PBRMaterial && mat.albedoTexture) {
-        const tex = mat.albedoTexture as Texture
-        tex.uScale = distance / 100
-        tex.vScale = 1.2
-      }
-
-      const baseWall = MeshBuilder.CreateBox(`wall-base-${wall.id}`, { 
-        width: distance, 
-        height: 120, 
-        depth: wall.thickness || 12 
-      }, scene)
-      baseWall.position = new Vector3(x1 + dx / 2, 60, y1 + dy / 2)
-      baseWall.rotation.y = -angle
-
-      const openings = wall.openings || []
-      if (openings.length > 0) {
-        let wallCSG = CSG.FromMesh(baseWall)
-        openings.forEach(op => {
-          const cutterHeight = op.type === 'Window' ? 60 : 120
-          const cutterY = op.type === 'Window' ? 80 : 60
-          const cutter = MeshBuilder.CreateBox(`cutter-${op.id}`, {
-            width: op.width, height: cutterHeight, depth: (wall.thickness || 12) + 20
-          }, scene)
-          cutter.position = new Vector3(x1 + dx * op.offset, cutterY, y1 + dy * op.offset)
-          cutter.rotation.y = -angle
-          wallCSG = wallCSG.subtract(CSG.FromMesh(cutter))
-          cutter.dispose()
-        })
-        const finalWall = wallCSG.toMesh(`wall-${wall.id}`, mat, scene, true)
-        baseWall.dispose()
-        finalWall.receiveShadows = true
-        if (shadowGenerator) shadowGenerator.addShadowCaster(finalWall)
-        wallsGroupRef.current.push(finalWall)
-      } else {
-        baseWall.material = mat
-        baseWall.receiveShadows = true
-        if (shadowGenerator) shadowGenerator.addShadowCaster(baseWall)
-        wallsGroupRef.current.push(baseWall)
-      }
-    })
-
-    // 2. SYNC ROOMS (FLOORS)
-    roomsGroupRef.current.forEach(m => m.dispose())
-    roomsGroupRef.current = []
-
-    rooms.forEach(room => {
-      const shape = []
-      for (let i = 0; i < room.points.length; i += 2) {
-        shape.push(new Vector3(room.points[i], 0, room.points[i+1]))
-      }
-      try {
-        const floor = MeshBuilder.ExtrudePolygon(`room-${room.id}`, { shape, depth: 4, sideOrientation: 2 }, scene, earcut)
-        floor.position.y = 2
-        const mat = createMaterial(`floorMat-${room.id}`, room.color || '#6366F1', room.textureUrl)
-        if (mat instanceof StandardMaterial && mat.diffuseTexture) {
-          const tex = mat.diffuseTexture as Texture
-          tex.uScale = 5
-          tex.vScale = 5
-        } else if (mat instanceof PBRMaterial && mat.albedoTexture) {
-          const tex = mat.albedoTexture as Texture
-          tex.uScale = 5
-          tex.vScale = 5
-        }
-        floor.material = mat
-        floor.receiveShadows = true
-        roomsGroupRef.current.push(floor)
-      } catch (e) {}
-    })
-
-    // 3. SYNC ITEMS
-    itemsGroupRef.current.forEach(m => m.dispose())
-    itemsGroupRef.current = []
-
-    placedItems.forEach(async (item) => {
-      if (item.modelUrl) {
-        try {
-          const result = await SceneLoader.ImportMeshAsync("", "", item.modelUrl, scene)
-          const root = result.meshes[0]
-          root.position = new Vector3(item.position.x, 2, item.position.z)
-          root.rotationQuaternion = null
-          root.rotation.y = (item.rotation * Math.PI) / 180
-          root.scaling = new Vector3(item.scale * 100, item.scale * 100, item.scale * 100)
-          
-          root.getChildMeshes().forEach(m => {
-            m.receiveShadows = true
-            if (shadowGenerator) shadowGenerator.addShadowCaster(m)
-          })
-          itemsGroupRef.current.push(root)
-        } catch (e) {
-          const fallback = MeshBuilder.CreateBox(`fallback-${item.id}`, { size: 40 }, scene)
-          fallback.position = new Vector3(item.position.x, 20, item.position.z)
-          if (shadowGenerator) shadowGenerator.addShadowCaster(fallback)
-          itemsGroupRef.current.push(fallback)
-        }
-      }
-    })
-  }, [wallLines, placedItems, rooms, renderSettings.pbr, shadowGeneratorRef.current])
+  }, [renderSettings.sunlight, renderSettings.shadows, sceneReady])
 
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-slate-950">
       <canvas ref={canvasRef} className="w-full h-full block outline-none" />
       
+      {sceneReady && (
+        <SceneProvider scene={sceneRef.current} shadowGenerator={shadowGeneratorRef.current}>
+          {wallLines.map(wall => <Wall3D key={wall.id} wall={wall} />)}
+          {rooms.map(room => <Room3D key={room.id} room={room} />)}
+          {placedItems.map((item) => {
+            if ('wallOffset' in item) {
+              return <WallDecoration3D key={item.id} item={item as any} />
+            }
+            if ('lightType' in item) {
+              return <Light3D key={item.id} light={item as any} />
+            }
+            if (item.type === 'Stair') {
+              return <Stair3D key={item.id} stair={item as any} />
+            }
+            return <Furniture3D key={item.id} item={item as any} />
+          })}
+        </SceneProvider>
+      )}
+
       {/* Viewport Info */}
       <div className="absolute top-4 left-4 flex flex-col gap-2">
         <div className="bg-base-100/60 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-white/10">
@@ -302,21 +184,21 @@ const Floorplan3DView: React.FC = () => {
           <RenderToggle 
             active={renderSettings.sunlight} 
             onClick={() => setRenderSettings({ sunlight: !renderSettings.sunlight })} 
-            icon={<Sun className="w-3.5 h-3.5" />} 
+            icon={<IconSun className="w-3.5 h-3.5" />} 
             label="Sunlight" 
           />
           <RenderToggle 
             active={renderSettings.shadows} 
             disabled={!renderSettings.sunlight}
             onClick={() => setRenderSettings({ shadows: !renderSettings.shadows })} 
-            icon={<Moon className="w-3.5 h-3.5" />} 
+            icon={<IconMoon className="w-3.5 h-3.5" />} 
             label="Shadows" 
           />
           <div className="h-px bg-white/5 mx-2 my-0.5" />
           <RenderToggle 
             active={renderSettings.pbr} 
             onClick={() => setRenderSettings({ pbr: !renderSettings.pbr })} 
-            icon={<Layers className="w-3.5 h-3.5" />} 
+            icon={<IconLayers className="w-3.5 h-3.5" />} 
             label="PBR Materials" 
           />
         </div>

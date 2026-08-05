@@ -1,22 +1,22 @@
 import React from 'react'
 import { 
-  Home, 
-  PenTool, 
-  Package, 
-  Compass, 
-  Star, 
-  Settings as SettingsIcon,
-  Folder
+  Home as IconHome, 
+  PenTool as IconPenTool, 
+  Package as IconPackage, 
+  Compass as IconCompass, 
+  Star as IconStar, 
+  Settings as IconSettings,
+  Folder as IconFolder
 } from 'lucide-react'
 import { useEditorStore } from '../../store/useEditorStore'
 import { EditorTab } from '../../types'
 
 const navItems: { name: EditorTab; icon: any }[] = [
-  { name: 'Home', icon: Home },
-  { name: 'Projects', icon: Folder },
-  { name: 'Draw', icon: PenTool },
-  { name: 'Items', icon: Package },
-  { name: 'Settings', icon: SettingsIcon },
+  { name: 'Home', icon: IconHome },
+  { name: 'Projects', icon: IconFolder },
+  { name: 'Draw', icon: IconPenTool },
+  { name: 'Items', icon: IconPackage },
+  { name: 'Settings', icon: IconSettings },
 ]
 
 const MiniNav: React.FC = () => {

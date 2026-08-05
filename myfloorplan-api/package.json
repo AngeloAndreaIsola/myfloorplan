@@ -8,12 +8,15 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "hono": "^4.0.0",
-    "@myfloorplan/shared": "workspace:*"
+    "@cloudflare/workers-types": "^4.20260423.1",
+    "@myfloorplan/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.0.0"
   },
   "devDependencies": {
     "@hono/vite-build": "^1.11.1",
-    "vite": "^5.0.0",
-    "typescript": "^5.0.0"
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
   }
 }

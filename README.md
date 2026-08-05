@@ -48,9 +48,11 @@ This monorepo is managed using [pnpm workspaces](https://pnpm.io/workspaces). Be
 - **[Web App](myfloorplan-web/README.md)**: A modern React application with Vite, DaisyUI, and Babylon.js for powerful 3D floorplan editing.
 - **[API Service](myfloorplan-api/README.md)**: A high-performance backend powered by Hono and Vite, providing the foundation for data persistence and logic.
 - **[Mobile App](myfloorplan-mobile/README.md)**: The mobile-first experience for managing floorplans on the go.
+- **[Admin Portal](myfloorplan-admin/README.md)**: Dashboard for managing users, projects, custom assets, and system crawling jobs.
 
 ### Supporting Libraries & Modules
 
+- **[Shared Core Library](myfloorplan-shared/README.md)**: Core schemas, types, and model validation logic.
 - **[Renderer](myfloorplan-renderer/README.md)**: Core rendering engine for 2D/3D visualizations.
 - **[Asset Center](myfloorplan-assetcenter/README.md)**: Centralized management for furniture models, textures, and other design assets.
 
@@ -61,6 +63,17 @@ Check out the [docs/](docs/) directory for detailed system information:
 - [How-To Guides](docs/HOWTO.md)
 - [Initialization Steps](docs/INIT.md)
 - [Roadmap & Plan](docs/PLAN.md)
+- [Editor UX Guide](docs/EDITOR_UX.md)
+
+**Versioned Plans & Progress**
+- [v0.1 — Plan](docs/plan/v0.1.md) · [Progress](docs/progress/v0.1.md)
+- [v0.2.x — Plan](docs/plan/v0.2.x.md) · [Progress](docs/progress/v0.2.md)
+
+**Design Specifications**
+- [API Specification](docs/design/API_SPEC.md)
+- [Data Format Specification](docs/design/DATA_FORMAT.md)
+- [Shared Package Usage Guide](docs/design/SHARED_PACKAGE.md)
+
 - [Current TODOs](docs/TODO.md)
 
 ## Getting Started

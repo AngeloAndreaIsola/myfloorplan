@@ -19,6 +19,20 @@ export interface Furniture extends Item {
   components?: string[]; // IDs of sub-items
 }
 
+export interface LightingItem extends Item {
+  lightType: 'point' | 'spot' | 'ambient';
+  intensity: number;
+  lightColor: string;
+  range?: number;
+  castShadows?: boolean;
+}
+
+export interface WallDecorationItem extends Item {
+  dimensions: Dimensions;
+  wallOffset: number;
+  thickness: number;
+}
+
 export interface LibraryItem {
   id: string;
   title: string;
@@ -27,4 +41,5 @@ export interface LibraryItem {
   imageUrl: string;
 }
 
-export type PlacedItem = Item | Furniture;
+import { StructuralElement } from './architecture';
+export type PlacedItem = Item | Furniture | LightingItem | WallDecorationItem | StructuralElement;

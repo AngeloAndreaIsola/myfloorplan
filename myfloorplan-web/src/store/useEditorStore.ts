@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import { v4 as uuidv4 } from 'uuid'
 import {
   EditorTab, ViewMode, DrawTool, WallOpening, WallLine, Room,
-  PlacedItem, LibraryItem, SelectedElement, Project, RenderSettings
+  PlacedItem, LibraryItem, SelectedElement, Project, RenderSettings, Floor, Asset
 } from '../types'
+import { api } from '../lib/api'
+import { v4 as uuidv4 } from 'uuid'
 
 interface EditorState {
   activeTab: EditorTab
@@ -14,11 +15,9 @@ interface EditorState {
   activeTool: DrawTool
   setActiveTool: (tool: DrawTool) => void
   
-  // Selection
   selectedElement: SelectedElement | null
   setSelectedElement: (element: SelectedElement | null) => void
   
-  // Floorplan Data
   viewMode: ViewMode
   setViewMode: (mode: ViewMode) => void
   wallLines: WallLine[]
@@ -35,9 +34,9 @@ interface EditorState {
   removeRoom: (id: string) => void
 
   addWallOpening: (wallId: string, opening: WallOpening) => void
+  updateWallOpening: (wallId: string, openingId: string, updates: Partial<WallOpening>) => void
   removeWallOpening: (wallId: string, openingId: string) => void
 
-  // Furniture Items
   placedItems: PlacedItem[]
   selectedLibraryItem: LibraryItem | null
   setSelectedLibraryItem: (item: LibraryItem | null) => void
@@ -45,21 +44,35 @@ interface EditorState {
   updatePlacedItem: (id: string, updates: Partial<PlacedItem>) => void
   removePlacedItem: (id: string) => void
 
-  // Project Management
+  // Project Management API Integrated
   projects: Project[]
   currentProjectId: string | null
+  isSyncing: boolean
+  
+  fetchProjects: () => Promise<void>
   setCurrentProjectId: (id: string | null) => void
-  addProject: (project: Project) => void
-  removeProject: (id: string) => void
-  updateProject: (id: string, updates: Partial<Project>) => void
-  saveCurrentProject: () => void
-  loadProject: (id: string) => void
-  // Rendering Settings
+  addProject: (data: Partial<Project>) => Promise<void>
+  removeProject: (id: string) => Promise<void>
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>
+  saveCurrentProject: () => Promise<void>
+  loadProject: (id: string) => Promise<void>
+
+  // Floor Management
+  floors: Floor[]
+  currentFloorId: string | null
+  addFloor: (name: string, level: number) => void
+  switchFloor: (id: string) => void
+  removeFloor: (id: string) => void
+  createNewProject: () => void
+  loadDemoHouse: () => void
+
   renderSettings: RenderSettings
   setRenderSettings: (settings: Partial<RenderSettings>) => void
-}
 
-const DEFAULT_PROJECT_ID = uuidv4()
+  // Assets
+  globalAssets: Asset[]
+  fetchGlobalAssets: () => Promise<void>
+}
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   activeTab: 'Home',
@@ -95,6 +108,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addWallOpening: (wallId, opening) => set((state) => ({
     wallLines: state.wallLines.map(w => w.id === wallId ? { ...w, openings: [...(w.openings || []), opening] } : w)
   })),
+  updateWallOpening: (wallId, openingId, updates) => set((state) => ({
+    wallLines: state.wallLines.map(w => w.id === wallId ? {
+      ...w,
+      openings: (w.openings || []).map(o => o.id === openingId ? { ...o, ...updates } : o)
+    } : w)
+  })),
   removeWallOpening: (wallId, openingId) => set((state) => ({
     wallLines: state.wallLines.map(w => w.id === wallId ? { ...w, openings: (w.openings || []).filter(o => o.id !== openingId) } : w)
   })),
@@ -110,51 +129,264 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     placedItems: state.placedItems.filter(item => item.id !== id)
   })),
 
-  // Project Management
-  projects: [
-    {
-      id: DEFAULT_PROJECT_ID,
-      name: 'Default Project',
-      description: 'Initial workspace project',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      data: { wallLines: [], rooms: [], placedItems: [] }
+  // Floor Management
+  floors: [{
+    id: 'ground-floor',
+    name: 'Ground Floor',
+    level: 0,
+    data: { wallLines: [], rooms: [], blocks: [], placedItems: [], entities: { actors: [], creatures: [], plants: [], units: [], devices: [], vehicles: [] }, activities: [] }
+  }],
+  currentFloorId: 'ground-floor',
+  
+  addFloor: (name, level) => set((state) => {
+    const newFloor: Floor = {
+      id: uuidv4(),
+      name,
+      level,
+      data: { wallLines: [], rooms: [], blocks: [], placedItems: [], entities: { actors: [], creatures: [], plants: [], units: [], devices: [], vehicles: [] }, activities: [] }
     }
-  ],
-  currentProjectId: DEFAULT_PROJECT_ID,
+    return { floors: [...state.floors, newFloor] }
+  }),
+
+  switchFloor: (id) => set((state) => {
+    if (state.currentFloorId === id) return {}
+    
+    // Save current active data to current floor
+    const updatedFloors = state.floors.map(f => {
+      if (f.id === state.currentFloorId) {
+        return {
+          ...f,
+          data: {
+            ...f.data,
+            wallLines: state.wallLines,
+            rooms: state.rooms,
+            placedItems: state.placedItems
+          }
+        }
+      }
+      return f
+    })
+
+    // Load target floor data
+    const targetFloor = updatedFloors.find(f => f.id === id)
+    if (!targetFloor) return { floors: updatedFloors }
+
+    return {
+      floors: updatedFloors,
+      currentFloorId: id,
+      wallLines: targetFloor.data.wallLines || [],
+      rooms: targetFloor.data.rooms || [],
+      placedItems: targetFloor.data.placedItems || [],
+      selectedElement: null
+    }
+  }),
+
+  removeFloor: (id) => set((state) => {
+    if (state.floors.length <= 1) return {} // Prevent deleting last floor
+    const newFloors = state.floors.filter(f => f.id !== id)
+    // If we deleted the active floor, switch to the first available
+    if (state.currentFloorId === id) {
+      const target = newFloors[0]
+      return {
+        floors: newFloors,
+        currentFloorId: target.id,
+        wallLines: target.data.wallLines || [],
+        rooms: target.data.rooms || [],
+        placedItems: target.data.placedItems || [],
+        selectedElement: null
+      }
+    }
+    return { floors: newFloors }
+  }),
+
+  createNewProject: () => {
+    const { projects } = get()
+    
+    // Create new empty project
+    const newProject: Project = {
+      id: uuidv4(),
+      name: 'New Project',
+      thumbnail: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=2070',
+      lastModified: new Date().toISOString(),
+      floors: [{
+        id: uuidv4(),
+        name: 'Ground Floor',
+        level: 0,
+        data: {
+          wallLines: [],
+          rooms: [],
+          placedItems: []
+        }
+      }]
+    }
+
+    set({
+      projects: [...projects, newProject],
+      currentProjectId: newProject.id,
+      floors: newProject.floors,
+      currentFloorId: newProject.floors[0].id,
+      wallLines: [],
+      rooms: [],
+      placedItems: [],
+      selectedElement: null,
+      activeTab: 'Home'
+    })
+  },
+
+  loadDemoHouse: () => {
+    // We will inject the logic for this via a separate utility
+    import('../lib/demoHouse').then(({ generateDemoHouse }) => {
+      const demoData = generateDemoHouse()
+      const { projects } = get()
+      
+      const demoProject: Project = {
+        id: uuidv4(),
+        name: 'Simple Studio',
+        thumbnail: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=2070',
+        lastModified: new Date().toISOString(),
+        floors: [{
+          id: uuidv4(),
+          name: 'Ground Floor',
+          level: 0,
+          data: demoData
+        }]
+      }
+
+      set((state) => ({
+        projects: [...projects, demoProject],
+        currentProjectId: demoProject.id,
+        floors: demoProject.floors,
+        currentFloorId: demoProject.floors[0].id,
+        wallLines: demoData.wallLines || [],
+        rooms: demoData.rooms || [],
+        placedItems: demoData.placedItems || [],
+        selectedElement: null,
+        activeTab: 'Home'
+      }))
+    })
+  },
+
+  // Project Management (API connected)
+  projects: [],
+  currentProjectId: null,
+  isSyncing: false,
+
+  fetchProjects: async () => {
+    try {
+      const projects = await api.fetchProjects()
+      set({ projects })
+    } catch (e) { console.error('Failed to fetch projects', e) }
+  },
+
   setCurrentProjectId: (id) => set({ currentProjectId: id }),
-  addProject: (project) => set((state) => ({ projects: [...state.projects, project] })),
-  removeProject: (id) => set((state) => ({ 
-    projects: state.projects.filter(p => p.id !== id),
-    currentProjectId: state.currentProjectId === id ? null : state.currentProjectId
-  })),
-  updateProject: (id, updates) => set((state) => ({
-    projects: state.projects.map(p => p.id === id ? { ...p, ...updates } : p)
-  })),
-  saveCurrentProject: () => {
+
+  addProject: async (data) => {
+    try {
+      set({ isSyncing: true })
+      const newProject = await api.createProject(data)
+      set((state) => ({ projects: [...state.projects, newProject], isSyncing: false }))
+    } catch (e) { 
+      console.error(e)
+      set({ isSyncing: false })
+    }
+  },
+
+  removeProject: async (id) => {
+    try {
+      set({ isSyncing: true })
+      await api.deleteProject(id)
+      set((state) => ({ 
+        projects: state.projects.filter(p => p.id !== id),
+        currentProjectId: state.currentProjectId === id ? null : state.currentProjectId,
+        isSyncing: false
+      }))
+    } catch (e) {
+      console.error(e)
+      set({ isSyncing: false })
+    }
+  },
+
+  updateProject: async (id, updates) => {
+    try {
+      set({ isSyncing: true })
+      await api.updateProject(id, updates)
+      set((state) => ({
+        projects: state.projects.map(p => p.id === id ? { ...p, ...updates } : p),
+        isSyncing: false
+      }))
+    } catch (e) {
+      console.error(e)
+      set({ isSyncing: false })
+    }
+  },
+
+  saveCurrentProject: async () => {
     const state = get()
     if (!state.currentProjectId) return
-    set((state) => ({
-      projects: state.projects.map(p => p.id === state.currentProjectId ? {
-        ...p,
-        updatedAt: new Date().toISOString(),
-        data: {
-          wallLines: state.wallLines,
-          rooms: state.rooms,
-          placedItems: state.placedItems
+    try {
+      set({ isSyncing: true })
+      
+      // Save active data back to current floor before syncing
+      const syncedFloors = state.floors.map(f => {
+        if (f.id === state.currentFloorId) {
+          return {
+            ...f,
+            data: {
+              ...f.data,
+              wallLines: state.wallLines,
+              rooms: state.rooms,
+              placedItems: state.placedItems
+            }
+          }
         }
-      } : p)
-    }))
+        return f
+      })
+
+      const projectUpdate = {
+        floors: syncedFloors,
+        data: syncedFloors[0].data // Backwards compatibility for single-floor apps
+      }
+      
+      await api.syncFloorplan(state.currentProjectId, projectUpdate)
+      set({ isSyncing: false, floors: syncedFloors })
+    } catch (e) {
+      console.error('Save failed', e)
+      set({ isSyncing: false })
+    }
   },
-  loadProject: (id) => {
-    const project = get().projects.find(p => p.id === id)
-    if (project) {
+
+  loadProject: async (id) => {
+    try {
+      set({ isSyncing: true })
+      const res = await api.loadFloorplan(id)
+      const projectData = res.data
+
+      let loadedFloors = projectData?.floors
+      
+      // Backwards compatibility migration
+      if (!loadedFloors || loadedFloors.length === 0) {
+        loadedFloors = [{
+          id: 'ground-floor',
+          name: 'Ground Floor',
+          level: 0,
+          data: projectData?.data || { wallLines: [], rooms: [], blocks: [], placedItems: [], entities: { actors: [], creatures: [], plants: [], units: [], devices: [], vehicles: [] }, activities: [] }
+        }]
+      }
+
+      const activeFloor = loadedFloors[0]
+
       set({
         currentProjectId: id,
-        wallLines: project.data.wallLines,
-        rooms: project.data.rooms,
-        placedItems: project.data.placedItems
+        floors: loadedFloors,
+        currentFloorId: activeFloor.id,
+        wallLines: activeFloor.data?.wallLines || [],
+        rooms: activeFloor.data?.rooms || [],
+        placedItems: activeFloor.data?.placedItems || [],
+        isSyncing: false
       })
+    } catch (e) {
+      console.error('Load failed', e)
+      set({ isSyncing: false })
     }
   },
 
@@ -165,6 +397,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setRenderSettings: (settings) => set((state) => ({ 
     renderSettings: { ...state.renderSettings, ...settings } 
-  }))
-}))
+  })),
 
+  // Assets
+  globalAssets: [],
+  fetchGlobalAssets: async () => {
+    try {
+      const assets = await api.fetchAssets()
+      set({ globalAssets: assets })
+    } catch (e) {
+      console.error('Failed to fetch assets', e)
+    }
+  }
+}))

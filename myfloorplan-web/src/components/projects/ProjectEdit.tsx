@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useEditorStore } from '../../store/useEditorStore'
 import { Project } from '../../types'
-import { X, Check } from 'lucide-react'
+import { X as IconX, Check as IconCheck } from 'lucide-react'
 
 interface ProjectEditProps {
   project: Project
@@ -31,7 +31,7 @@ const ProjectEdit: React.FC<ProjectEditProps> = ({ project, onClose }) => {
         <div className="p-6 border-b border-base-300 flex items-center justify-between">
           <h3 className="text-xl font-bold">Edit Project</h3>
           <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">
-            <X className="w-5 h-5" />
+            <IconX className="w-5 h-5" />
           </button>
         </div>
         

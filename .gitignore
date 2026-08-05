@@ -142,3 +142,10 @@ ui-debug.log*
 # Workspace
 .idea/
 *.code-workspace
+
+# Cloudflare
+.wrangler/
+
+# Python
+__pycache__/
+*.py[cod]

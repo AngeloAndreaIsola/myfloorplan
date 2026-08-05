@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { useEditorStore } from '../../store/useEditorStore'
 import { Project } from '../../types'
-import { X, Check } from 'lucide-react'
+import { X as IconX, Check as IconCheck } from 'lucide-react'
 
 interface NewProjectDialogProps {
   onClose: () => void
@@ -39,7 +39,7 @@ const NewProjectDialog: React.FC<NewProjectDialogProps> = ({ onClose }) => {
         <div className="p-6 border-b border-base-300 flex items-center justify-between">
           <h3 className="text-xl font-bold">New Project</h3>
           <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">
-            <X className="w-5 h-5" />
+            <IconX className="w-5 h-5" />
           </button>
         </div>
         
