@@ -1,0 +1,4 @@
+my_files/** filter=lfs diff=lfs merge=lfs -text
+bathroom-configurator/** filter=lfs diff=lfs merge=lfs -text
+bathroom-viewer/** filter=lfs diff=lfs merge=lfs -text
+manufacturer-assets/** filter=lfs diff=lfs merge=lfs -text

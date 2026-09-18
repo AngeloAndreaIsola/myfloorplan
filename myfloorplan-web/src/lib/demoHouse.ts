@@ -74,7 +74,8 @@ export const generateDemoHouse = () => {
     color: '#E0F2FE'
   });
 
-  // Placed Items (Furniture & Lights)
+  // === EXISTING ITEMS (all kept) ===
+
   // Living Room Sofa
   placedItems.push({
     id: uuidv4(),
@@ -126,7 +127,7 @@ export const generateDemoHouse = () => {
     modelUrl: ''
   });
 
-  // Bathroom Tub
+  // Bathroom Tub (OLD — kept as is)
   placedItems.push({
     id: uuidv4(),
     type: 'Bathtub',
@@ -137,6 +138,128 @@ export const generateDemoHouse = () => {
     imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
     modelUrl: ''
   });
+
+  // === NEW BATHROOM ITEMS (added on top, old ones kept) ===
+
+  // Floor tiles 120×120cm (Florim Essential Mood Warm Powder 01, matte)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Tile 120×120',
+    category: 'Bathroom',
+    position: { x: 550, y: 0, z: 550 },
+    rotation: 0,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Shower (back-left corner — replaces bathtub position)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Shower',
+    category: 'Bathroom',
+    position: { x: 504, y: 0, z: 460 },
+    rotation: 0,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // New toilet (right wall, near door)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Toilet',
+    category: 'Bathroom',
+    position: { x: 653, y: 0, z: 458 },
+    rotation: 270,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Bidet (right wall, middle — same position as before)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Bidet',
+    category: 'Bathroom',
+    position: { x: 653, y: 0, z: 536 },
+    rotation: 270,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Cabinet above bidet (right wall)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Bathroom Cabinet',
+    category: 'Bathroom',
+    position: { x: 685, y: 0, z: 536 },
+    rotation: 0,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Sink (left wall, back-left)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Sink',
+    category: 'Bathroom',
+    position: { x: 487, y: 0, z: 500 },
+    rotation: 90,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Sink cabinet (under sink)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Bathroom Cabinet',
+    category: 'Bathroom',
+    position: { x: 487, y: 0, z: 500 },
+    rotation: 90,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Shower head (back wall above shower)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Shower Head',
+    category: 'Bathroom',
+    position: { x: 504, y: 0, z: 400 },
+    rotation: 180,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Radiator (under window, right wall)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Radiator',
+    category: 'Bathroom',
+    position: { x: 685, y: 0, z: 610 },
+    rotation: 270,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
+
+  // Under-sink cabinet lockers (left wall, near shower)
+  placedItems.push({
+    id: uuidv4(),
+    type: 'Cabinet Locker',
+    category: 'Bathroom',
+    position: { x: 440, y: 0, z: 460 },
+    rotation: 90,
+    scale: { x: 1, y: 1 },
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500&q=80',
+    modelUrl: ''
+  } as any);
 
   return { wallLines, rooms, placedItems };
 };

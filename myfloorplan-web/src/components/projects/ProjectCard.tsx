@@ -40,7 +40,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onEdit }) => {
             <IconCalendar className="w-3 h-3" />
             {new Date(project.updatedAt).toLocaleDateString()}
           </span>
-          <span>{project.data.wallLines.length} Walls</span>
+          <span>{(project.data?.wallLines?.length ?? 0)} Walls</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 pt-2">

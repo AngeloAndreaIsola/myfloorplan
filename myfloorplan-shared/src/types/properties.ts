@@ -29,4 +29,5 @@ export interface RenderSettings {
   sunlight: boolean;
   shadows: boolean;
   pbr: boolean;
+  wallTransparency: boolean;
 }

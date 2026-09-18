@@ -1,10 +1,15 @@
 import { create } from 'zustand'
 import {
   EditorTab, ViewMode, DrawTool, WallOpening, WallLine, Room,
-  PlacedItem, LibraryItem, SelectedElement, Project, RenderSettings, Floor, Asset
+  PlacedItem, LibraryItem, SelectedElement, Project, RenderSettings, Floor, Asset,
+  FloorplanData
 } from '../types'
 import { api } from '../lib/api'
 import { v4 as uuidv4 } from 'uuid'
+import { generateDemoHouse } from '../lib/demoHouse'
+import { Wall, StructuralElement } from '@myfloorplan/shared'
+import { Device, Vehicle, Activity } from '@myfloorplan/shared'
+import { Actor, Creature, Plant, Unit } from '@myfloorplan/shared'
 
 interface EditorState {
   activeTab: EditorTab
@@ -75,7 +80,7 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  activeTab: 'Home',
+  activeTab: 'Projects',
   setActiveTab: (tab) => set({ activeTab: tab }),
   isSidebarOpen: true,
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
@@ -234,35 +239,50 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   loadDemoHouse: () => {
-    // We will inject the logic for this via a separate utility
-    import('../lib/demoHouse').then(({ generateDemoHouse }) => {
-      const demoData = generateDemoHouse()
-      const { projects } = get()
-      
-      const demoProject: Project = {
-        id: uuidv4(),
-        name: 'Simple Studio',
-        thumbnail: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=2070',
-        lastModified: new Date().toISOString(),
-        floors: [{
-          id: uuidv4(),
-          name: 'Ground Floor',
-          level: 0,
-          data: demoData
-        }]
-      }
+    const demoData = generateDemoHouse()
+    const { projects } = get()
 
-      set((state) => ({
-        projects: [...projects, demoProject],
-        currentProjectId: demoProject.id,
-        floors: demoProject.floors,
-        currentFloorId: demoProject.floors[0].id,
-        wallLines: demoData.wallLines || [],
-        rooms: demoData.rooms || [],
-        placedItems: demoData.placedItems || [],
-        selectedElement: null,
-        activeTab: 'Home'
-      }))
+    const floorplanData: FloorplanData = {
+      wallLines: demoData.wallLines as Wall[],
+      rooms: demoData.rooms,
+      blocks: [],
+      structuralElements: [],
+      placedItems: demoData.placedItems,
+      entities: {
+        actors: [],
+        creatures: [],
+        plants: [],
+        units: [],
+        devices: [],
+        vehicles: []
+      },
+      activities: []
+    }
+
+    const demoProject: Project = {
+      id: uuidv4(),
+      name: 'Simple Studio',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=2070',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      floors: [{
+        id: uuidv4(),
+        name: 'Ground Floor',
+        level: 0,
+        data: floorplanData
+      }]
+    }
+
+    set({
+      projects: [...projects, demoProject],
+      currentProjectId: demoProject.id,
+      floors: demoProject.floors,
+      currentFloorId: demoProject.floors[0].id,
+      wallLines: demoData.wallLines || [],
+      rooms: demoData.rooms || [],
+      placedItems: demoData.placedItems || [],
+      selectedElement: null,
+      activeTab: 'Home'
     })
   },
 
@@ -393,7 +413,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   renderSettings: {
     sunlight: false,
     shadows: false,
-    pbr: false
+    pbr: false,
+    wallTransparency: false
   },
   setRenderSettings: (settings) => set((state) => ({ 
     renderSettings: { ...state.renderSettings, ...settings } 

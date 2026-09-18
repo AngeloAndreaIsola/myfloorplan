@@ -10,7 +10,8 @@ import {
   WallDecorationItem as SharedWallDecorationItem,
   StructuralElement as SharedStructuralElement,
   Floor as SharedFloor,
-  Asset as SharedAsset
+  Asset as SharedAsset,
+  FloorplanData as SharedFloorplanData
 } from '@myfloorplan/shared';
 
 export type EditorTab = 'Home' | 'Draw' | 'Items' | 'Explore' | 'Favourites' | 'Settings' | 'Projects'
@@ -29,6 +30,7 @@ export type WallDecorationItem = SharedWallDecorationItem;
 export type StructuralElement = SharedStructuralElement;
 export type Floor = SharedFloor;
 export type Asset = SharedAsset;
+export type FloorplanData = SharedFloorplanData;
 
 export type SelectedType = 'Wall' | 'Room' | 'Item' | 'Opening'
 export interface SelectedElement {

@@ -28,7 +28,7 @@ const Floorplan2DView: React.FC = () => {
     wallLines, addWallLine, 
     addWallOpening,
     rooms, addRoom,
-    placedItems, addPlacedItem, 
+    placedItems, addPlacedItem, updatePlacedItem,
     selectedLibraryItem, setSelectedLibraryItem,
     selectedElement, setSelectedElement,
     gridSize, activeTool, setActiveTool,
@@ -41,6 +41,7 @@ const Floorplan2DView: React.FC = () => {
     addRoom: state.addRoom,
     placedItems: state.placedItems,
     addPlacedItem: state.addPlacedItem,
+    updatePlacedItem: state.updatePlacedItem,
     selectedLibraryItem: state.selectedLibraryItem,
     setSelectedLibraryItem: state.setSelectedLibraryItem,
     selectedElement: state.selectedElement,
@@ -94,6 +95,23 @@ const Floorplan2DView: React.FC = () => {
   // Ruler State
   const [rulerStart, setRulerStart] = useState<{ x: number, y: number } | null>(null)
   const [rulerEnd, setRulerEnd] = useState<{ x: number, y: number } | null>(null)
+
+  // Keyboard rotation for selected furniture (arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedElement?.type !== 'Item') return
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      e.preventDefault()
+      const step = e.shiftKey ? 15 : 5
+      const item = placedItems.find(i => i.id === selectedElement!.id)
+      if (!item) return
+      const delta = e.key === 'ArrowRight' ? step : -step
+      const newRot = (((item.rotation as number) + delta) % 360 + 360) % 360
+      updatePlacedItem(selectedElement.id, { rotation: Math.round(newRot) })
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedElement, placedItems, updatePlacedItem])
 
   useEffect(() => {
     if (!containerRef.current) return

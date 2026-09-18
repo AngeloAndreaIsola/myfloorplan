@@ -30,12 +30,20 @@ const Wall3D: React.FC<Wall3DProps> = ({ wall }) => {
       pbr.albedoColor = Color3.FromHexString(colorHex)
       pbr.metallic = 0.1
       pbr.roughness = 0.6
+      if (renderSettings.wallTransparency) {
+        pbr.alpha = 0.25
+        pbr.backFaceCulling = false
+      }
       if (wall.textureUrl) pbr.albedoTexture = new Texture(wall.textureUrl, scene)
       mat = pbr
     } else {
       const std = new StandardMaterial(matName, scene)
       std.diffuseColor = Color3.FromHexString(colorHex)
       std.specularColor = new Color3(0, 0, 0)
+      if (renderSettings.wallTransparency) {
+        std.alpha = 0.25
+        std.backFaceCulling = false
+      }
       if (wall.textureUrl) std.diffuseTexture = new Texture(wall.textureUrl, scene)
       mat = std
     }
@@ -148,7 +156,7 @@ const Wall3D: React.FC<Wall3DProps> = ({ wall }) => {
     return () => {
       meshesToDispose.forEach(m => m.dispose())
     }
-  }, [scene, wall, renderSettings.pbr, shadowGenerator])
+  }, [scene, wall, renderSettings.pbr, renderSettings.wallTransparency, shadowGenerator])
 
   return null
 }
